@@ -1,0 +1,169 @@
+package br.gov.sp.cpma.domain.service;
+
+import br.gov.sp.cpma.api.dto.CadastroRegistroTrabalhoRequest;
+import br.gov.sp.cpma.api.dto.RegistroTrabalhoResponse;
+import br.gov.sp.cpma.api.dto.ResumoCumprimentoResponse;
+import br.gov.sp.cpma.api.exception.DomainException;
+import br.gov.sp.cpma.domain.entity.Instituicao;
+import br.gov.sp.cpma.domain.entity.Pena;
+import br.gov.sp.cpma.domain.entity.RegistroDeTrabalho;
+import br.gov.sp.cpma.domain.repository.InstituicaoRepository;
+import br.gov.sp.cpma.domain.repository.PenaRepository;
+import br.gov.sp.cpma.domain.repository.RegistroDeTrabalhoRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
+
+@Service
+public class RegistroTrabalhoService {
+
+    private final RegistroDeTrabalhoRepository registroRepository;
+    private final PenaRepository penaRepository;
+    private final InstituicaoRepository instituicaoRepository;
+
+    public RegistroTrabalhoService(RegistroDeTrabalhoRepository registroRepository,
+                                  PenaRepository penaRepository,
+                                  InstituicaoRepository instituicaoRepository) {
+        this.registroRepository = registroRepository;
+        this.penaRepository = penaRepository;
+        this.instituicaoRepository = instituicaoRepository;
+    }
+
+    @Transactional
+    public RegistroTrabalhoResponse registrar(CadastroRegistroTrabalhoRequest req) {
+        Pena pena = penaRepository.findById(req.getPenaId())
+                .orElseThrow(() -> new DomainException("PENA_NOT_FOUND", "Pena nao encontrada", HttpStatus.NOT_FOUND));
+
+        Instituicao instituicao = null;
+        if (req.getInstituicaoId() != null) {
+            instituicao = instituicaoRepository.findById(req.getInstituicaoId())
+                    .orElse(pena.getInstituicaoPrincipal());
+        } else {
+            instituicao = pena.getInstituicaoPrincipal();
+        }
+
+        Double horas = req.getHorasCumpridas();
+        if (horas == null || horas <= 0.0) {
+            horas = calcularHorasPelosHorarios(req.getHorarioInicio(), req.getHorarioAlmoco(), req.getHorarioVolta(), req.getHorarioSaida());
+        }
+
+        RegistroDeTrabalho reg = new RegistroDeTrabalho();
+        reg.setPena(pena);
+        reg.setInstituicao(instituicao);
+        reg.setDataTrabalho(req.getDataTrabalho());
+        reg.setHorasCumpridas(horas);
+        reg.setAtividades(req.getAtividades());
+        reg.setHorarioInicio(req.getHorarioInicio());
+        reg.setHorarioAlmoco(req.getHorarioAlmoco());
+        reg.setHorarioVolta(req.getHorarioVolta());
+        reg.setHorarioSaida(req.getHorarioSaida());
+
+        RegistroDeTrabalho salvo = registroRepository.save(reg);
+        return new RegistroTrabalhoResponse(salvo);
+    }
+
+    @Transactional
+    public List<RegistroTrabalhoResponse> registrarEmLote(List<CadastroRegistroTrabalhoRequest> requests) {
+        if (requests == null || requests.isEmpty()) {
+            return List.of();
+        }
+
+        List<RegistroDeTrabalho> registros = new ArrayList<>();
+        for (CadastroRegistroTrabalhoRequest req : requests) {
+            Pena pena = penaRepository.findById(req.getPenaId())
+                    .orElseThrow(() -> new DomainException("PENA_NOT_FOUND", "Pena nao encontrada", HttpStatus.NOT_FOUND));
+
+            Instituicao instituicao = null;
+            if (req.getInstituicaoId() != null) {
+                instituicao = instituicaoRepository.findById(req.getInstituicaoId())
+                        .orElse(pena.getInstituicaoPrincipal());
+            } else {
+                instituicao = pena.getInstituicaoPrincipal();
+            }
+
+            Double horas = req.getHorasCumpridas();
+            if (horas == null || horas <= 0.0) {
+                horas = calcularHorasPelosHorarios(req.getHorarioInicio(), req.getHorarioAlmoco(), req.getHorarioVolta(), req.getHorarioSaida());
+            }
+
+            RegistroDeTrabalho reg = new RegistroDeTrabalho();
+            reg.setPena(pena);
+            reg.setInstituicao(instituicao);
+            reg.setDataTrabalho(req.getDataTrabalho());
+            reg.setHorasCumpridas(horas);
+            reg.setAtividades(req.getAtividades());
+            reg.setHorarioInicio(req.getHorarioInicio());
+            reg.setHorarioAlmoco(req.getHorarioAlmoco());
+            reg.setHorarioVolta(req.getHorarioVolta());
+            reg.setHorarioSaida(req.getHorarioSaida());
+
+            registros.add(reg);
+        }
+
+        List<RegistroDeTrabalho> salvos = registroRepository.saveAll(registros);
+        return salvos.stream().map(RegistroTrabalhoResponse::new).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<RegistroTrabalhoResponse> listarPorPena(Long penaId) {
+        if (!penaRepository.existsById(penaId)) {
+            throw new DomainException("PENA_NOT_FOUND", "Pena nao encontrada", HttpStatus.NOT_FOUND);
+        }
+        return registroRepository.findByPena_IdPenaOrderByDataTrabalhoDesc(penaId)
+                .stream()
+                .map(RegistroTrabalhoResponse::new)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<RegistroTrabalhoResponse> listarPorPenaEMes(Long penaId, int ano, int mes) {
+        if (!penaRepository.existsById(penaId)) {
+            throw new DomainException("PENA_NOT_FOUND", "Pena nao encontrada", HttpStatus.NOT_FOUND);
+        }
+        java.time.LocalDate inicio = java.time.LocalDate.of(ano, mes, 1);
+        java.time.LocalDate fim = inicio.withDayOfMonth(inicio.lengthOfMonth());
+        return registroRepository.findByPena_IdPenaAndDataTrabalhoBetweenOrderByDataTrabalhoAsc(penaId, inicio, fim)
+                .stream()
+                .map(RegistroTrabalhoResponse::new)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public RegistroTrabalhoResponse buscarUltimoRegistro(Long penaId) {
+        if (!penaRepository.existsById(penaId)) {
+            throw new DomainException("PENA_NOT_FOUND", "Pena nao encontrada", HttpStatus.NOT_FOUND);
+        }
+        return registroRepository.findFirstByPena_IdPenaOrderByDataTrabalhoDesc(penaId)
+                .map(RegistroTrabalhoResponse::new)
+                .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public ResumoCumprimentoResponse obterResumo(Long penaId) {
+        Pena pena = penaRepository.findById(penaId)
+                .orElseThrow(() -> new DomainException("PENA_NOT_FOUND", "Pena nao encontrada", HttpStatus.NOT_FOUND));
+
+        Double horasCumpridas = registroRepository.somarHorasCumpridasPorPena(penaId);
+        Long usuarioId = pena.getUsuario() != null ? pena.getUsuario().getIdUsuario() : null;
+        String usuarioNome = pena.getUsuario() != null ? pena.getUsuario().getNome() : "";
+
+        return new ResumoCumprimentoResponse(pena.getIdPena(), usuarioId, usuarioNome, pena.getHorasTotais(), horasCumpridas);
+    }
+
+    private Double calcularHorasPelosHorarios(String inicio, String almoco, String volta, String saida) {
+        try {
+            LocalTime tInicio = (inicio != null && !inicio.isBlank()) ? LocalTime.parse(inicio.trim()) : null;
+            LocalTime tAlmoco = (almoco != null && !almoco.isBlank()) ? LocalTime.parse(almoco.trim()) : null;
+            LocalTime tVolta = (volta != null && !volta.isBlank()) ? LocalTime.parse(volta.trim()) : null;
+            LocalTime tSaida = (saida != null && !saida.isBlank()) ? LocalTime.parse(saida.trim()) : null;
+            return br.gov.sp.cpma.domain.util.CalculadoraExecucaoPenal.calcularHorasPorTurnos(tInicio, tAlmoco, tVolta, tSaida);
+        } catch (Exception ex) {
+            return 0.0;
+        }
+    }
+}

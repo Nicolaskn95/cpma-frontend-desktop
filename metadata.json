@@ -1,0 +1,6 @@
+{
+  "name": "CPMA - Gestão de Penas Alternativas",
+  "description": "Sistema web para gestão e controle de penas e medidas alternativas, instituições parceiras, registros de trabalho e identificação facial biométrica.",
+  "permissions": [],
+  "capabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

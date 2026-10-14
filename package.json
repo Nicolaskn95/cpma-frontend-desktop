@@ -1,0 +1,42 @@
+{
+  "name": "cpma-penas-alternativas",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "description": "Sistema de Gestão de Penas Alternativas, API Server Backend e Totem Biométrico Kiosk",
+  "scripts": {
+    "dev": "tsx server.ts",
+    "build": "vite build",
+    "start": "tsx server.ts",
+    "electron": "electron .",
+    "electron:dev": "electron .",
+    "electron:pack": "vite build && electron .",
+    "start:admin": "tsx server.ts",
+    "start:totem": "tsx server.ts",
+    "start:totem:web": "tsx server.ts",
+    "test:all": "node scripts/launcher.js test"
+  },
+  "author": "Secretaria da Administração Penitenciária - SP",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "lucide-react": "^0.475.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^44.7.2",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^6.0.1"
+  }
+}
